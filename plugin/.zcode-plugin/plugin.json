@@ -1,0 +1,24 @@
+{
+  "name": "davinci-laya-decisions",
+  "version": "0.1.0",
+  "description": "Локальный decision-engine Laya (127.0.0.1:8095) в точках контроля ZCode: RiskGate на PreToolUse (shadow по умолчанию), DoneGate на Stop, EvidenceLedger, ранжирование контекста и MCP-инструменты типизированных решений choice/score/noul.",
+  "description_i18n": {
+    "en": "Local Laya decision-engine (127.0.0.1:8095) at ZCode control points: PreToolUse RiskGate (shadow by default), Stop DoneGate, EvidenceLedger, context ranking and MCP tools for typed decisions choice/score/noul.",
+    "zh-CN": "本地 Laya 决策引擎（127.0.0.1:8095）接入 ZCode 控制点：PreToolUse 风险闸门（默认 shadow）、Stop 完成闸门、证据账本、上下文排序，以及 choice/score/noul 类型化决策 MCP 工具。"
+  },
+  "author": {
+    "name": "DaVinci Cyber Engineering"
+  },
+  "license": "MIT",
+  "keywords": [
+    "laya",
+    "decision-engine",
+    "hooks",
+    "mcp",
+    "risk-gate",
+    "local-inference",
+    "da-vinci"
+  ],
+  "commands": "commands",
+  "skills": "skills"
+}

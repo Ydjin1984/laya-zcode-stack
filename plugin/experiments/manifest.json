@@ -1,0 +1,265 @@
+{
+  "note": "Карта прогонов A/B: agentId → эксперимент/режим. Токены — из журналов model-io (io-captures) и отчётов ZCode; пик контекста — максимум inputTokens по вызовам. Прогоны -v2: после дедупликации вывода триажа и встроенных сниппетов. Репликация r3: пары A/C в одинаковых условиях; log700-final — дисциплинированный промпт.",
+  "runs": [
+    {
+      "agent": "agent_b4d654d1-6cb6-4d59-a41d-8166609faa20",
+      "experiment": "log700",
+      "mode": "A",
+      "ioCaptured": false,
+      "harnessTokens": 294965,
+      "toolUses": 2,
+      "durationMs": 12223,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_9ce05d22-6760-4466-ac20-39c2a8e7cd9e",
+      "experiment": "log700",
+      "mode": "A",
+      "ioCaptured": true,
+      "harnessTokens": 296498,
+      "toolUses": 3,
+      "durationMs": 11434,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_6719f18c-9695-4853-bb46-a15ec1115d3c",
+      "experiment": "log700",
+      "mode": "A",
+      "ioCaptured": true,
+      "harnessTokens": 392157,
+      "toolUses": 3,
+      "durationMs": 17057,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_9e534a83-4438-41c1-8924-f762c3fb8293",
+      "experiment": "log700",
+      "mode": "A",
+      "ioCaptured": true,
+      "harnessTokens": 392389,
+      "toolUses": 3,
+      "durationMs": 14261,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_588d0a7b-cf74-4c41-863d-dafbf9ed4568",
+      "experiment": "log700",
+      "mode": "C",
+      "ioCaptured": false,
+      "harnessTokens": 651652,
+      "toolUses": 10,
+      "durationMs": 22782,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_dcb4d4da-8f66-49c7-8614-c7f9d0c0241e",
+      "experiment": "log700",
+      "mode": "C",
+      "ioCaptured": "partial",
+      "harnessTokens": 472141,
+      "toolUses": 14,
+      "durationMs": 22392,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_4ff81a70-d85b-40ba-99bd-04032a105d24",
+      "experiment": "log700",
+      "mode": "C",
+      "ioCaptured": true,
+      "harnessTokens": 469313,
+      "toolUses": 7,
+      "durationMs": 29726,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_f21590bf-62d2-48e0-89a2-4c3988b4ce2d",
+      "experiment": "log700",
+      "mode": "C",
+      "ioCaptured": true,
+      "harnessTokens": 472298,
+      "toolUses": 8,
+      "durationMs": 39492,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_7ee2a487-cce5-4c21-82b6-d24e8d638f4b",
+      "experiment": "search",
+      "mode": "A",
+      "ioCaptured": false,
+      "harnessTokens": 418565,
+      "toolUses": 7,
+      "durationMs": 23743,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_d045b78b-a9e6-43e6-ac90-2ff303e27c05",
+      "experiment": "search",
+      "mode": "A",
+      "ioCaptured": true,
+      "harnessTokens": 521318,
+      "toolUses": 7,
+      "durationMs": 23676,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_20d46326-9a01-47e6-a748-1a6514ecfe42",
+      "experiment": "search",
+      "mode": "C",
+      "ioCaptured": false,
+      "harnessTokens": 1220535,
+      "toolUses": 14,
+      "durationMs": 42956,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_bc7687b4-e530-4704-8af3-8b7d3f9dc98e",
+      "experiment": "search",
+      "mode": "C",
+      "ioCaptured": true,
+      "harnessTokens": 589420,
+      "toolUses": 9,
+      "durationMs": 31168,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_359ed2d7-d004-4e85-bc4d-9e27fe6f48ad",
+      "experiment": "log7000",
+      "mode": "A",
+      "ioCaptured": true,
+      "harnessTokens": 727006,
+      "toolUses": 10,
+      "durationMs": 21219,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_df28c8a6-23ee-4853-90e8-ecdfb7a84c15",
+      "experiment": "log7000",
+      "mode": "C",
+      "ioCaptured": true,
+      "harnessTokens": 2015051,
+      "toolUses": 38,
+      "durationMs": 98816,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_89ec6581-3678-42a2-a6d1-aa034fa5cad1",
+      "experiment": "log7000-v2",
+      "mode": "C",
+      "ioCaptured": "partial",
+      "harnessTokens": 464639,
+      "toolUses": 6,
+      "durationMs": 18627,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_3a467d41-039c-419a-b07f-5ce4786b8dcb",
+      "experiment": "log700-v2",
+      "mode": "C",
+      "ioCaptured": "partial",
+      "harnessTokens": 464988,
+      "toolUses": 5,
+      "durationMs": 20920,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_b6d93c7f-6d95-45b7-b021-47753577b0a7",
+      "experiment": "log700-v2",
+      "mode": "C",
+      "ioCaptured": "partial",
+      "harnessTokens": 564997,
+      "toolUses": 8,
+      "durationMs": 26248,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_b4694208-8010-47be-8911-e5c6c4732328",
+      "experiment": "search-v2",
+      "mode": "C",
+      "ioCaptured": true,
+      "harnessTokens": 592234,
+      "toolUses": 13,
+      "durationMs": 37341,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_b9b15932-bfef-4ea3-9086-e22af3e9ad34",
+      "experiment": "log7000-r3",
+      "mode": "A",
+      "ioCaptured": true,
+      "harnessTokens": 1257067,
+      "toolUses": 7,
+      "durationMs": 26298,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_42cb523e-fd98-44bd-9035-6966cdbe8ea6",
+      "experiment": "log7000-r3",
+      "mode": "C",
+      "ioCaptured": true,
+      "harnessTokens": 562589,
+      "toolUses": 7,
+      "durationMs": 28465,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_2bf22c92-3e8d-49b9-b999-d070899ec367",
+      "experiment": "log700-r3",
+      "mode": "A",
+      "ioCaptured": true,
+      "harnessTokens": 195444,
+      "toolUses": 1,
+      "durationMs": 8868,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_c202c06b-20e8-4163-8b5a-4d4694ab60ac",
+      "experiment": "log700-r3",
+      "mode": "C",
+      "ioCaptured": true,
+      "harnessTokens": 559155,
+      "toolUses": 6,
+      "durationMs": 23422,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_b60abd39-d9fb-4180-a0a1-bdf2d0617cf5",
+      "experiment": "search-r3",
+      "mode": "A",
+      "ioCaptured": true,
+      "harnessTokens": 630401,
+      "toolUses": 8,
+      "durationMs": 30786,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_05fd9d4c-562b-4355-a4b6-432cac5efb11",
+      "experiment": "search-r3",
+      "mode": "C",
+      "ioCaptured": true,
+      "harnessTokens": 585610,
+      "toolUses": 13,
+      "durationMs": 31467,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_7e1857e6-7a8f-45ac-a709-cc4853ee243f",
+      "experiment": "log700-v2",
+      "mode": "C",
+      "ioCaptured": true,
+      "harnessTokens": 469457,
+      "toolUses": 7,
+      "durationMs": 22833,
+      "answerCorrect": true
+    },
+    {
+      "agent": "agent_e2c22ca2-9f9a-49fc-98d1-4abeae656b7c",
+      "experiment": "log700-final",
+      "mode": "C",
+      "ioCaptured": true,
+      "harnessTokens": 183528,
+      "toolUses": 1,
+      "durationMs": 10795,
+      "answerCorrect": true
+    }
+  ]
+}

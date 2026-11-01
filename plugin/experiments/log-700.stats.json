@@ -1,0 +1,11 @@
+{
+  "lines": 700,
+  "bytes": 35741,
+  "bigLines": 7010,
+  "bigBytes": 358247,
+  "plantedErrors": [
+    "TS2345 src/domain/cart.ts:118 (string → number)",
+    "TypeError map undefined — checkout.test.ts / discounts.ts:77",
+    "ENOENT config/prod.json (prepare-config.mjs)"
+  ]
+}

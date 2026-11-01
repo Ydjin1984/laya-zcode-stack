@@ -1,0 +1,31 @@
+# Large and generated files
+engine/models/*.onnx
+engine/models/tokenizer.json
+engine/bin/*.dll
+engine/bin/*.pdb
+engine/third_party/cuda12/*
+engine/third_party/ort/*
+engine/third_party/ort-gpu/*
+engine/third_party/ort125/*
+engine/logs/*
+plugin/experiments/io-captures/
+plugin/experiments/*.log
+*.rar
+*.zip
+
+# Runtime data
+**/metrics/
+**/state/
+**/chunks/
+**/node_modules/
+**/.cache/
+**/__pycache__/
+**/*.pyc
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+!engine/third_party/cuda12/README.md

@@ -1,0 +1,16 @@
+{
+  "name": "laya-zcode-stack",
+  "owner": {
+    "name": "DaVinci Cyber Engineering"
+  },
+  "plugins": [
+    {
+      "name": "davinci-laya-decisions",
+      "source": "./plugin",
+      "version": "0.1.0",
+      "description": "Local Laya decision engine in ZCode: risk gate, evidence ledger, done gate and 13 typed-decision/context MCP tools.",
+      "displayName": "DaVinci x Laya: local decisions",
+      "category": "developer-tools"
+    }
+  ]
+}

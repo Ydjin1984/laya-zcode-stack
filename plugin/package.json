@@ -1,0 +1,20 @@
+{
+  "name": "davinci-laya-decisions",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ZCode-плагин: локальные решения Laya в hooks и MCP. Без зависимостей: только Node.js stdlib (fetch входит в Node 18+).",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node tests/run-all.mjs",
+    "test:contract": "node tests/contract.test.mjs",
+    "test:gates": "node tests/gate-fixtures.test.mjs",
+    "test:mcp": "node tests/mcp-smoke.test.mjs",
+    "test:replay": "node tests/replay.test.mjs",
+    "status": "node scripts/laya-admin.mjs status",
+    "bench": "node scripts/laya-admin.mjs bench",
+    "bench:context": "node scripts/laya-context-economy.mjs"
+  }
+}

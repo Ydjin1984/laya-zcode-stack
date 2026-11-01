@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "davinci-laya-decisions": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${ZCODE_PLUGIN_ROOT}/src/mcp-server.mjs"],
+      "cwd": "${ZCODE_PROJECT_DIR}",
+      "env": {
+        "DAVINCI_LAYA_DATA": "${CLAUDE_PLUGIN_DATA}",
+        "DAVINCI_LAYA_URL": "http://127.0.0.1:8095",
+        "DAVINCI_LAYA_PROJECT_DIR": "${ZCODE_PROJECT_DIR}"
+      },
+      "timeoutMs": 120000
+    }
+  }
+}
