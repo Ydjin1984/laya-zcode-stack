@@ -456,6 +456,28 @@ await test("laya_run_check закрывает пробел: проверка и�
   assertEq(r.telemetry.gaps, [], "пробелов нет");
   assertEq(r.telemetry.availableChecks.includes("test"), true, "доступные проверки видны");
 });
+await test("упавшая проверка остаётся high даже когда уведомление уже исчерпано", async () => {
+  const { recordProjectCheck, updateLedger } = await import("../src/evidence-ledger.mjs");
+  const client = fakeClient();
+  const cfgReport = { ...baseCfg, doneGate: { ...baseCfg.doneGate, mode: "report" } };
+  await postToolGate(
+    { session_id: "d6", tool_name: "Write", tool_input: { file_path: path.join(projectDir, "src", "e.ts"), content: "x" }, tool_response: { success: true } },
+    { cfg: cfgReport },
+  );
+  recordProjectCheck(projectDir, { checkId: "test", kind: "test", command: "npm test", exitCode: 1, ts: Date.now() + 1 });
+  updateLedger("d6", (l) => {
+    l.counters = l.counters || {};
+    l.counters.done_notify = 1;
+    l.blocks = 1;
+  }, cfgReport);
+  const r = await stopGate(
+    { session_id: "d6", stop_hook_active: false, cwd: projectDir, mode: "guarded", permission_mode: "guarded" },
+    { client, cfg: cfgReport },
+  );
+  assertEq(r.output, null, "повторное уведомление запрещено");
+  assert(r.telemetry.gaps.some((g) => g.id === "failing-tests" && g.severity === "high"), "провал проверки сохранён");
+  assertEq(r.telemetry.action, "log", "только лог, но не no-gaps");
+});
 await test("yolo: evidence собирается, блокировки нет, уведомление о конкретной проверке", async () => {
   const client = fakeClient();
   const cfgBlock = { ...baseCfg, doneGate: { ...baseCfg.doneGate, mode: "block", maxBlocksPerSession: 1 } };

@@ -210,9 +210,15 @@ Short version (details and caveats in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)):
 - Context selection reduced tool output by **57–88%** in the original byte
   measurements.
 - On an agent task with the same model and prompt (3 runs per variant):
-  deterministic self-fetching reduced median input tokens by **~26.5%**;
-  enabling Laya ranking reduced them by a further **~9.3%** (n=3, ranges
-  overlap, so this is an observed effect, not a statistically proven constant).
+  deterministic self-fetching reduced total input (including cache) by
+  **~26.5%** and wall time by **~24.5%**; Laya ranking reduced total input by
+  a further **~9.3%** with no wall-time gain (n=3, ranges overlap).
+- The provider's `inputTokens` **includes** `cacheReadTokens`; non-cached input
+  was 22.8k / 28.6k / 27.8k for A/B/C. The reductions above are mostly cache
+  reuse and fewer requests, **not** a proven fresh-token or cost saving. Cost
+  must be computed per run with the provider's cache pricing.
+- On these nine runs, no acceptance regression was observed; this is not a
+  claim that no fragment can ever be lost.
 - `/health` is not classification latency: on the test machine `/health` p50
   was ~1.5 ms while `/decide` p50 was ~26 ms.
 

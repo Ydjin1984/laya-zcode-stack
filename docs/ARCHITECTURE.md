@@ -48,7 +48,8 @@ discovers available project checks, and reports only concrete gaps:
 - no checks discoverable → informational, not a failure.
 
 Default delivery is one short notification with `continue:true` (once per
-session), so the agent actually sees it. `decision:"block"` is used only when
+session), so the agent actually sees it. A failed check (`failing-tests`) stays high even after the notification
+or block quota is exhausted; only the action changes to plain logging. `decision:"block"` is used only when
 `doneGate.mode="block"` and the current permission mode is explicitly listed in
 `doneGate.activeModes`.
 

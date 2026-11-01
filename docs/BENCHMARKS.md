@@ -42,21 +42,29 @@ One fixture, one bug-fixing task, same prompt and model
 All 9 runs succeeded: `npm test` exit 0, hidden acceptance passed, `tests/`
 unchanged, only `src/pricing/discounts.mjs` modified.
 
+**Usage semantics:** the provider's `inputTokens` includes `cacheReadTokens`
+(verified by `raw_usage_json`: `total = input + output`, `cache_read <= input`).
+“Input” is therefore not “fresh” input. Non-cached input = `input − cache_read`.
+Cost is not computed here; cache-read pricing depends on the provider.
+
 | Median | A raw | B no Laya | C with Laya |
 |---|---:|---:|---:|
-| input tokens | 359,085 | 264,062 | 239,544 |
-| total tokens | 361,230 | 265,806 | 241,389 |
+| input tokens (includes cache) | 359,085 | 264,062 | 239,544 |
 | cache read | 336,281 | 236,410 | 211,777 |
+| **non-cached input** (`input − cache`, median per run) | **22,804** | **28,566** | **27,767** |
+| total tokens | 361,230 | 265,806 | 241,389 |
 | model requests | 16 | 10 | 9 |
 | tool calls | 20 | 13 | 10 |
 | wall, s | 119.1 | 89.9 | 91.1 |
 
 Contributions:
 
-- **A → B (deterministic self-fetching):** input −26.5%, wall −24.5%.
-- **B → C (Laya ranking):** input −9.3%, requests 10→9, tool calls 13→10,
-  wall +1.3% (noise).
-- **A → C:** input −33.3%, wall −23.5%.
+- **A → B (deterministic self-fetching):** total input −26.5%, requests 16→10,
+  wall −24.5%; **non-cached input +25.3%**. This is fewer requests and more
+  cache reuse, not a proven fresh-token or cost saving.
+- **B → C (Laya ranking):** total input −9.3%, requests 10→9, tool calls 13→10,
+  wall +1.3% (noise); non-cached input about −2.8% (within range).
+- **A → C:** total input −33.3%, wall −23.5%; non-cached input +21.8%.
 
 Caveats:
 
@@ -66,6 +74,8 @@ Caveats:
   small blocks ran without Laya (`laya_used=false`), and `laya_run_check` does
   not use Laya.
 - `Kibborg_Flash_v5.7` is the local CLI model; it is not DeepSeek.
+- On this task, the acceptance criteria showed no regressions across the nine
+  runs; this is not a claim that no fragment can ever be lost.
 - Full report and raw methodology: `plugin/experiments/agent-ab-2026-11-02.md`.
 
 ## Verification artifacts
