@@ -1,6 +1,6 @@
 {
   "name": "davinci-laya-decisions",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Локальный decision-engine Laya (127.0.0.1:8095) в точках контроля ZCode: RiskGate на PreToolUse (shadow по умолчанию), DoneGate на Stop, EvidenceLedger, ранжирование контекста и MCP-инструменты типизированных решений choice/score/noul.",
   "description_i18n": {
     "en": "Local Laya decision-engine (127.0.0.1:8095) at ZCode control points: PreToolUse RiskGate (shadow by default), Stop DoneGate, EvidenceLedger, context ranking and MCP tools for typed decisions choice/score/noul.",

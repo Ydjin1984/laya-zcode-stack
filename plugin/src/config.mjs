@@ -194,15 +194,15 @@ export const DEFAULTS = {
     investigationThreshold: 0.7,
   },
 
-  // SessionStart: false — не добавлять ничего в контекст (экономия токенов);
-  // true — одна строка со статусом Laya (готов/недоступен).
-  sessionContext: false,
+  // SessionStart: по умолчанию одна строка статуса Laya на старте сессии.
+  // Это не влияет на разрешения и не добавляет вызов на каждый ход.
+  sessionContext: true,
 
-  // Laya-first: true — режим /laya-all. Включает низкие пороги применения
-  // self-fetching инструментов (search/read_relevant/run_check/triage/rank).
-  // Это НЕ требование вызывать Laya каждый ход: мелкие операции читаются
-  // напрямую, а health проверяется на старте/при диагностике.
-  layaAll: false,
+  // Laya-first включён по умолчанию: низкие пороги применения self-fetching
+  // инструментов (search/read_relevant/run_check/triage/rank). Это НЕ требование
+  // вызывать Laya каждый ход: мелкие операции читаются напрямую, а инструменты
+  // применяются там, где заменяют чтение. Режим не меняет risk/done/activeModes.
+  layaAll: true,
 
   ledger: { maxEventsPerSession: 800, ttlHours: 72 },
   telemetry: { enabled: true, keepDays: 14 },
@@ -279,8 +279,8 @@ export function ensureDataDir() {
       riskGate: { mode: "shadow", askMinConfidence: 0.7, stateCharBudget: 20000 },
       doneGate: { mode: "report", maxBlocksPerSession: 1, notify: true },
       router: { mode: "log" },
-      sessionContext: false,
-      layaAll: false,
+      sessionContext: true,
+      layaAll: true,
       layaUrl: process.env.DAVINCI_LAYA_URL || DEFAULTS.layaUrl,
       timeoutMs: DEFAULTS.timeoutMs,
     };

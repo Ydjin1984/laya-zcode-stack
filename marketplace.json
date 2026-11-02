@@ -7,7 +7,7 @@
     {
       "name": "davinci-laya-decisions",
       "source": "./plugin",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "description": "Local Laya decision engine in ZCode: risk gate, evidence ledger, done gate and 13 typed-decision/context MCP tools.",
       "displayName": "DaVinci x Laya: local decisions",
       "category": "developer-tools"

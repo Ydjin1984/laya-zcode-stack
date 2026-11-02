@@ -161,14 +161,16 @@ After the first run ZCode creates:
 %USERPROFILE%\.zcode\cli\plugins\data\davinci-laya-decisions@<marketplace>\config.json
 ```
 
-Defaults are conservative:
+Laya-first is on by default: `layaAll=true`, `router=log`,
+`sessionContext=true`. Gates stay conservative:
 
 ```json
 {
   "riskGate": { "mode": "shadow", "activeModes": ["guarded"] },
   "doneGate": { "mode": "report", "activeModes": ["guarded"], "notify": true },
   "router": { "mode": "log" },
-  "sessionContext": false
+  "sessionContext": true,
+  "layaAll": true
 }
 ```
 

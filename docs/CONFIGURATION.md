@@ -31,8 +31,8 @@ print the active path.
     "notify": true
   },
   "router": { "mode": "log" },
-  "sessionContext": false,
-  "layaAll": false,
+  "sessionContext": true,
+  "layaAll": true,
   "budget": { "maxLen": 1024, "hardStateChars": 20000, "marginTokens": 12 },
   "runChecks": { "autoDiscover": true, "commands": {}, "timeoutMs": 180000 },
   "search": { "maxHits": 200, "contextLines": 2, "timeoutMs": 15000 },

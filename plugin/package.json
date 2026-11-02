@@ -1,6 +1,6 @@
 {
   "name": "davinci-laya-decisions",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "type": "module",
   "description": "ZCode-плагин: локальные решения Laya в hooks и MCP. Без зависимостей: только Node.js stdlib (fetch входит в Node 18+).",
