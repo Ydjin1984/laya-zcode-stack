@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -35,6 +36,15 @@ func envStr(name, def string) string {
 func envInt(name string, def int) int {
 	if v := os.Getenv(name); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return def
+}
+
+func envInt64(name string, def int64) int64 {
+	if v := os.Getenv(name); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
 			return n
 		}
 	}
@@ -68,10 +78,20 @@ func main() {
 		headLen   = flag.Int("head-len", envInt("LAYA_HEAD_MAX_LEN", 256), "бюджет блока вопросов (rl_agent_config.json: 256)")
 		threads   = flag.Int("threads", envInt("LAYA_THREADS", 0), "потоков ONNX на CPU (0 — по умолчанию)")
 		device    = flag.String("device", envStr("LAYA_DEVICE", engine.DeviceCUDA), "где считать: cuda (видеокарта) или cpu")
-		deviceID  = flag.Int("device-id", envInt("LAYA_DEVICE_ID", 0), "номер видеокарты (у нас 3060 — это 1, если 0 занята 3090)")
+		deviceID  = flag.Int("device-id", envInt("LAYA_DEVICE_ID", 0), "номер видеокарты (на этой машине GTX 1650 — это 0)")
 		cpuFallb  = flag.Bool("allow-cpu-fallback", envBool("LAYA_CPU_FALLBACK", false), "разрешить тихий откат на CPU, если CUDA не поднялась")
 		warmup    = flag.Bool("warmup", envBool("LAYA_WARMUP", true), "прогреть видеокарту одним вызовом после загрузки модели")
 		selftest  = flag.Bool("selftest", false, "прогнать один вопрос и выйти (проверка установки)")
+
+		workEnabled   = flag.Bool("work", envBool("LAYA_WORK", true), "включить панель /work (только для loopback-адреса)")
+		workDB        = flag.String("work-db", envStr("LAYA_WORK_DB", filepath.Join("data", "work.db")), "SQLite-файл панели /work")
+		workTokenFile = flag.String("work-token-file", envStr("LAYA_WORK_TOKEN_FILE", filepath.Join("data", "work-token")), "файл локального токена записи (сам токен в аргументах не передаётся)")
+		workSpoolDir  = flag.String("work-spool-dir", envStr("LAYA_WORK_SPOOL_DIR", filepath.Join("data", "work-spool")), "каталог spool-событий плагина")
+		workDemo      = flag.Bool("work-demo", envBool("LAYA_WORK_DEMO", false), "показать демонстрационные данные (по умолчанию выключено)")
+		workKeepDays  = flag.Int("work-keep-days", envInt("LAYA_WORK_KEEP_DAYS", 30), "сколько дней хранить события /work")
+		workMaxEvents = flag.Int("work-max-events", envInt("LAYA_WORK_MAX_EVENTS", 50_000), "максимум событий /work")
+		workMaxBytes  = flag.Int64("work-max-bytes", envInt64("LAYA_WORK_MAX_BYTES", 512<<20), "лимит объёма SQLite /work в байтах")
+		workMaxInput  = flag.Int("work-max-input-chars", envInt("LAYA_WORK_MAX_INPUT_CHARS", 65_536), "лимит текста входа в событии /work")
 	)
 	flag.Parse()
 
@@ -135,10 +155,19 @@ func main() {
 	// (инициализация CUDA-ядер и выделение буферов). Без него первый же запрос
 	// Киборга не укладывался в таймаут клиента и уходил в fallback — формально
 	// безвредно, но статистика быстрых маршрутов теряла начало работы.
+	//
+	// Прогреваем две формы, потому что форма тензоров влияет на аллокации:
+	// маршрут Киборга (6 вопросов) и риск-гейт плагина (1 вопрос choice —
+	// набор "core"; 3 вопроса — набор "full"). Иначе первый хук после старта
+	// сервиса платил бы за новую форму сотни миллисекунд.
 	if *warmup {
 		warmStart := time.Now()
 		if _, err := m.Decide(warmupState, warmupQuestions()); err != nil {
 			log.Printf("[LAYA] прогрев не удался (%v) — продолжаю, первый вызов будет медленнее", err)
+		} else if _, err := m.Decide(warmupRiskState, warmupRiskQuestions("core")); err != nil {
+			log.Printf("[LAYA] прогрев риск-формы core не удался (%v) — не критично", err)
+		} else if _, err := m.Decide(warmupRiskState, warmupRiskQuestions("full")); err != nil {
+			log.Printf("[LAYA] прогрев риск-формы full не удался (%v) — не критично", err)
 		} else {
 			log.Printf("[LAYA] прогрев выполнен за %.1f мс", float64(time.Since(warmStart).Microseconds())/1000.0)
 		}
@@ -150,6 +179,49 @@ func main() {
 	}
 
 	srv := server.New(m, info)
+	if *workEnabled {
+		if !loopbackAddr(*addr) {
+			// Не ограничиваемся предупреждением: панель не должна оказаться в
+			// сети при случайном bind на 0.0.0.0.
+			log.Printf("[LAYA] work: адрес %s не loopback — панель отключена", *addr)
+		} else {
+			store, err := server.OpenWorkStore(server.WorkStoreConfig{
+				DBPath:        *workDB,
+				KeepDays:      *workKeepDays,
+				MaxEvents:     *workMaxEvents,
+				MaxBytes:      *workMaxBytes,
+				MaxInputChars: *workMaxInput,
+				SpoolDir:      *workSpoolDir,
+			})
+			if err != nil {
+				log.Printf("[LAYA] work отключён: %v", err)
+			} else {
+				defer store.Close()
+				workCtx, workCancel := context.WithCancel(context.Background())
+				defer workCancel()
+				if *workDemo {
+					store.SeedDemo()
+				} else {
+					store.DeleteDemo()
+				}
+				api, err := server.NewWorkAPI(store, server.WorkConfig{
+					Token:         os.Getenv("LAYA_WORK_TOKEN"),
+					TokenFile:     *workTokenFile,
+					MaxInputChars: *workMaxInput,
+					Demo:          *workDemo,
+					BindAddr:      *addr,
+				}, srv.WorkStatus)
+				if err != nil {
+					log.Printf("[LAYA] work отключён: %v", err)
+				} else {
+					srv.AttachWork(api)
+					store.StartSpool(workCtx, *workSpoolDir)
+					go store.Maintain(workCtx)
+					log.Printf("[LAYA] work: http://%s/work (db %s, spool %s)", *addr, *workDB, *workSpoolDir)
+				}
+			}
+		}
+	}
 	mux := http.NewServeMux()
 	srv.Routes(mux)
 
@@ -202,6 +274,33 @@ func runSelftest(m *engine.Model) {
 // warmupState — короткое состояние прогрева. Взято из реальных запросов Киборга:
 // прогрев на «пустом» тексте не прогревает те же ядра, что рабочий путь.
 const warmupState = "Привет! Покажи, что умеешь."
+
+// warmupRiskState — типичное состояние риск-гейта плагина (команда + git-фон):
+// прогрев обязан повторять текстуру рабочего входа, а не абстрактный текст.
+const warmupRiskState = "Инструмент: Bash\nКоманда: git status --short\nПуть: (нет)\nGit: On branch main, clean"
+
+// warmupRiskQuestions — форма риск-гейта плагина. Два набора прогреваются
+// отдельно, потому что число рядов в батче меняет форму тензоров:
+//
+//	"core" — один choice (риск-класс) — боевой набор по умолчанию;
+//	"full" — тот же choice плюс два noul (data_loss, exfiltration).
+func warmupRiskQuestions(set string) []engine.Question {
+	core := engine.Question{
+		Type:         engine.QChoice,
+		Instructions: "Выбери категорию риска действия, если выполнить его как есть.",
+		Criteria: []byte(`{"low": "Чтение или безвредная операция, легко отменяется",
+			"medium": "Меняет обычные файлы проекта, восстановление возможно (git, бэкап)",
+			"high": "Потеря данных, утечка секретов, необратимое или внешнее действие"}`),
+	}
+	if set == "full" {
+		return []engine.Question{
+			{Type: engine.QNoul, Instructions: "Уничтожит ли это действие несохранённые или невосстановимые данные пользователя (сброс изменений, удаление файлов, перезапись без копии)?"},
+			{Type: engine.QNoul, Instructions: "Может ли это действие отправить секрет (токен, пароль, ключ, содержимое .env) за пределы машины или записать его в открытый файл?"},
+			core,
+		}
+	}
+	return []engine.Question{core}
+}
 
 // warmupQuestions — те же вопросы, что задаёт Киборг на горячем пути. Число
 // вариантов в choice влияет на форму тензоров, поэтому прогрев должен совпадать
@@ -266,4 +365,19 @@ func setupLog(path string) error {
 	log.SetFlags(log.LstdFlags)
 	log.Printf("[LAYA] --- запуск %s, лог: %s", time.Now().Format("2006-01-02 15:04:05"), path)
 	return nil
+}
+
+// loopbackAddr проверяет, что сервис слушает только loopback. Для /work это
+// обязательное условие: иначе страница и API оказались бы доступны из сети.
+func loopbackAddr(addr string) bool {
+	host := addr
+	if h, _, err := net.SplitHostPort(addr); err == nil {
+		host = h
+	}
+	host = strings.Trim(strings.ToLower(host), "[]")
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }

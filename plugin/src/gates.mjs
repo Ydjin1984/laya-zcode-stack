@@ -26,6 +26,7 @@ import { decideFitted } from "./budget.mjs";
 import { discoverChecks } from "./project.mjs";
 import { readLedger, recordToolUse, updateLedger, bumpCounter, readProjectChecks } from "./evidence-ledger.mjs";
 import { recordEvent } from "./telemetry.mjs";
+import { recordPolicyEvent, recordAgentAction } from "./work-client.mjs";
 
 const TOOL_MATCH_CACHE = new Map();
 function toolMatches(pattern, toolName) {
@@ -134,6 +135,15 @@ export async function preToolGate(input, deps = {}) {
       },
       cfg,
     );
+    recordPolicyEvent({
+      action: "skip_mode",
+      basis: "permission_mode",
+      reason: `permission_mode=${permissionMode ?? "unknown"} вне activeModes`,
+      layaCalled: false,
+      operation: "risk_gate",
+      evidence: { permission_mode: permissionMode, active_modes: cfg.riskGate.activeModes },
+      status: "skipped",
+    });
     return { output: null, telemetry: { skipped: "permission_mode", permissionMode } };
   }
 
@@ -214,6 +224,35 @@ export async function preToolGate(input, deps = {}) {
     cfg,
   );
 
+  recordPolicyEvent({
+    action: verdict.action,
+    basis: verdict.source,
+    ruleIds: detHits.map((h) => h.id),
+    reason: verdict.reason,
+    layaCalled: Boolean(laya && laya.ok),
+    fallback: Boolean(laya && !laya.ok),
+    input: { original_redacted: rawState, effective_redacted: state },
+    fit: laya?.fit || null,
+    result: laya
+      ? {
+          elapsed_ms: laya.elapsedMs,
+          checkpoint: laya.checkpoint,
+          selected: verdict.riskClass,
+          answer_confidence: verdict.confidence,
+          risk: verdict.laya || null,
+        }
+      : null,
+    evidence: {
+      det_hits: detHits.map((h) => `${h.id}:${h.risk}`),
+      permission_mode: permissionMode,
+      fit: laya?.fit || null,
+    },
+    operation: "risk_gate",
+    callId: laya?.call_id,
+    startedAt: Date.now() - latencyMs,
+    status: "completed",
+  });
+
   let output = null;
   if (verdict.mode === "ask" && verdict.action === "ask") {
     output = {
@@ -290,6 +329,14 @@ export async function postToolGate(input, deps = {}) {
       error: input?.error,
       cfg,
     });
+    recordAgentAction({
+      tool: toolName,
+      command: toolInput.command || "",
+      exitCode: ok ? 0 : 1,
+      durationMs: input?.duration_ms ?? input?.durationMs ?? null,
+      toolUseId: input?.tool_use_id,
+      error: input?.error || null,
+    });
   }
   return { output: null, telemetry: { recorded: ok ? "success" : "failure" } };
 }
@@ -305,6 +352,14 @@ export async function postToolFailureGate(input, deps = {}) {
     ok: false,
     error: { code: input?.error || "tool_failure", message: input?.error || "" },
     cfg,
+  });
+  recordAgentAction({
+    tool: toolName || "tool",
+    command: input?.tool_input?.command || "",
+    exitCode: 1,
+    durationMs: input?.duration_ms ?? input?.durationMs ?? null,
+    toolUseId: input?.tool_use_id,
+    error: input?.error || "tool_failure",
   });
   return { output: null, telemetry: { recorded: "failure" } };
 }
@@ -430,6 +485,24 @@ export async function stopGate(input, deps = {}) {
     cfg,
   );
 
+  recordPolicyEvent({
+    action,
+    basis: "evidence",
+    ruleIds: gaps.map((g) => g.id),
+    reason: gaps.map((g) => g.detail).join("; ") || "no-gaps",
+    layaCalled: false,
+    evidence: {
+      gaps: gaps.map((g) => ({ id: g.id, severity: g.severity, detail: g.detail, check_id: g.check_id || null })),
+      changed_files: (ledger.changedFiles || []).length,
+      checks: mergedChecks.slice(-20),
+      available_checks: Object.keys(discovered),
+      permission_mode: permissionMode,
+      block_skipped: blockSkipped,
+    },
+    operation: "done_gate",
+    status: "completed",
+  });
+
   return { output, telemetry: { gaps, action, permissionMode, blockSkipped, availableChecks: Object.keys(discovered) } };
 }
 
@@ -498,6 +571,30 @@ export async function userPromptGate(input, deps = {}) {
     },
     cfg,
   );
+  recordPolicyEvent({
+    action: rec.available ? `class:${rec.taskClass}` : "unavailable",
+    basis: "router",
+    ruleIds: [],
+    reason: rec.reason || "",
+    layaCalled: Boolean(laya && laya.ok),
+    fallback: Boolean(laya && !laya.ok),
+    input: { original_redacted: prompt, effective_redacted: prepared.text },
+    fit: laya?.fit || null,
+    result: laya
+      ? {
+          elapsed_ms: laya.elapsedMs,
+          checkpoint: laya.checkpoint,
+          selected: rec.taskClass || "",
+          confidence: rec.confidence ?? null,
+          trivial: rec.trivial ?? null,
+          investigation: rec.investigation ?? null,
+        }
+      : null,
+    evidence: { thresholds: rec.thresholds || null, basis: rec.basis || null },
+    operation: "router",
+    callId: laya?.call_id,
+    status: "completed",
+  });
   let output = null;
   // По умолчанию router.mode="log": класс задачи уходит в метрики, а не в
   // каждый промпт. advise оставлен только как явный opt-in для замеров.

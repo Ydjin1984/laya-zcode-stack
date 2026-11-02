@@ -206,6 +206,18 @@ export const DEFAULTS = {
 
   ledger: { maxEventsPerSession: 800, ttlHours: 72 },
   telemetry: { enabled: true, keepDays: 14 },
+  // Панель Laya Work. Быстрый путь — spool-файл в каталоге движка; HTTP —
+  // резервный транспорт для внешних клиентов. Пустые spoolDir/url означают
+  // «панель не настроена»: события не пишутся и хуки не замедляются.
+  work: {
+    enabled: true,
+    url: "",
+    spoolDir: "",
+    token: "",
+    tokenFile: "",
+    timeoutMs: 400,
+    maxSpoolFiles: 5000,
+  },
   // Хранилище вытесненных чанков (ContextSelector): сколько файлов держать.
   chunks: { maxFiles: 500 },
 };
@@ -241,6 +253,13 @@ export function loadConfig() {
     const v = Number.parseInt(process.env.DAVINCI_LAYA_TIMEOUT_MS, 10);
     if (Number.isFinite(v) && v > 0) cfg.timeoutMs = v;
   }
+  if (process.env.DAVINCI_LAYA_WORK_ENABLED !== undefined) {
+    cfg.work.enabled = !["0", "false", "off", "no"].includes(String(process.env.DAVINCI_LAYA_WORK_ENABLED).toLowerCase());
+  }
+  if (process.env.DAVINCI_LAYA_WORK_URL) cfg.work.url = process.env.DAVINCI_LAYA_WORK_URL;
+  if (process.env.DAVINCI_LAYA_WORK_SPOOL) cfg.work.spoolDir = process.env.DAVINCI_LAYA_WORK_SPOOL;
+  if (process.env.DAVINCI_LAYA_WORK_TOKEN) cfg.work.token = process.env.DAVINCI_LAYA_WORK_TOKEN;
+  if (process.env.DAVINCI_LAYA_WORK_TOKEN_FILE) cfg.work.tokenFile = process.env.DAVINCI_LAYA_WORK_TOKEN_FILE;
   return cfg;
 }
 

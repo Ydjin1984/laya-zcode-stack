@@ -12,6 +12,8 @@
 // исключение — осознанный вывод decision:"block" (Stop) в режиме block.
 
 import { createInterface } from "node:readline";
+import { loadConfig } from "./config.mjs";
+import { runWithWorkTrace, flushWork } from "./work-client.mjs";
 
 /** Читает stdin целиком (одна JSON-строка от ZCode). */
 export async function readStdin() {
@@ -55,7 +57,27 @@ export async function runHook(name, body) {
   try {
     const input = await readHookInput();
     if (!input) emit(null);
-    const result = await body(input);
+    const cfg = loadConfig();
+    const op = {
+      "pre-tool": "risk_gate",
+      "post-tool": "agent_action",
+      "post-tool-failure": "agent_action",
+      "stop": "done_gate",
+      "user-prompt": "router",
+      "session-start": "session_start",
+    }[name] || name;
+    const meta = {
+      cfg,
+      operation: op,
+      sessionId: input.session_id,
+      toolUseId: input.tool_use_id,
+      tool: input.tool_name,
+      originalRedacted: input.tool_input?.command || input.prompt || "",
+    };
+    const result = await runWithWorkTrace(meta, () => body(input));
+    // Spool-запись синхронна; HTTP-fallback намеренно не ожидается, чтобы
+    // недоступный /work не добавлял задержку хуку.
+    await flushWork();
     emit(result?.output ?? null);
   } catch (err) {
     diag(`${name}: ${err?.stack || err?.message || err}`);

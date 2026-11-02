@@ -15,6 +15,7 @@
 import { createInterface } from "node:readline";
 import { toolList, findTool } from "./tools.mjs";
 import { ensureDataDir, loadConfig } from "./config.mjs";
+import { runWithWorkTrace, recordToolResult } from "./work-client.mjs";
 import pkg from "../package.json" with { type: "json" };
 
 const SUPPORTED_PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"];
@@ -65,7 +66,30 @@ async function handleRequest(msg) {
         return;
       }
       try {
-        const res = await def.handler(args);
+        const cfg = loadConfig();
+        const started = Date.now();
+        const sessionId = process.env.ZCODE_SESSION_ID || process.env.CLAUDE_SESSION_ID || null;
+        const res = await runWithWorkTrace(
+          { cfg, tool: name, operation: name, sessionId },
+          async () => {
+            const out = await def.handler(args);
+            // Запись внутри trace: tool_result должен нести тот же trace/session,
+            // что и model_call, иначе панель не свяжет их.
+            if (name !== "laya_health") {
+              const sc = out?.structuredContent || null;
+              recordToolResult({
+                tool: name,
+                result: sc,
+                startedAt: started,
+                evidence: toolEvidence(name, sc),
+                status: out?.isError ? "error" : "completed",
+                action: toolAction(name),
+                layaCalled: toolUsedLaya(name, sc),
+              });
+            }
+            return out;
+          },
+        );
         sendResult(id, res);
       } catch (err) {
         sendResult(id, {
@@ -79,6 +103,72 @@ async function handleRequest(msg) {
     default:
       if (typeof id !== "undefined") sendError(id, -32601, `method not found: ${method}`);
   }
+}
+
+/** Действие плагина для ленты: не безликое «tool_result». */
+function toolAction(name) {
+  switch (name) {
+    case "laya_search":
+    case "laya_search_relevant":
+    case "laya_rank_diff":
+      return "rank";
+    case "laya_read_relevant":
+      return "keep";
+    case "laya_run_check":
+      return "check";
+    case "laya_get_chunk":
+      return "chunk_read";
+    case "laya_context_pick":
+      return "context_pick";
+    case "laya_log_triage":
+      return "triage";
+    case "laya_decide":
+    case "laya_classify":
+    case "laya_score":
+    case "laya_batch":
+      return "answer";
+    default:
+      return "tool_result";
+  }
+}
+
+/** Вызывалась ли Laya в этом инструменте (для «Laya не вызывалась» в UI). */
+function toolUsedLaya(name, sc) {
+  if (name === "laya_get_chunk" || name === "laya_run_check") return false;
+  if (name === "laya_read_relevant") return sc?.laya_used !== false;
+  return true;
+}
+
+/**
+ * Короткое evidence для панели. Полный текст сюда не попадает: только id
+ * артефакта, размеры и факты проверки.
+ */
+function toolEvidence(name, sc) {
+  if (!sc || typeof sc !== "object") return null;
+  const ev = {};
+  if (sc.savings && typeof sc.savings === "object") Object.assign(ev, sc.savings);
+  if (sc.chunk_id) ev.chunk_id = sc.chunk_id;
+  if (Array.isArray(sc.stored_ids)) ev.stored_ids = sc.stored_ids.slice(0, 50);
+  if (name === "laya_get_chunk") {
+    ev.chunk_id = sc.id || sc.chunk_id || null;
+    ev.returned_chars = sc.returned_chars ?? null;
+    ev.bytes = sc.bytes ?? null;
+    ev.offset = sc.offset ?? null;
+    ev.limit = sc.limit ?? null;
+    ev.full = sc.full === true;
+  }
+  if (name === "laya_run_check") {
+    ev.check_id = sc.check_id || null;
+    ev.command = sc.command || null;
+    ev.exit_code = sc.exit_code ?? null;
+    ev.timed_out = sc.timed_out === true;
+    ev.errors = Array.isArray(sc.errors) ? sc.errors.length : 0;
+  }
+  if (name === "laya_batch") {
+    ev.items = Array.isArray(sc.results) ? sc.results.length : null;
+    ev.ok_items = Array.isArray(sc.results) ? sc.results.filter((r) => r && r.ok).length : null;
+  }
+  return Object.keys(ev).length ? ev : null;
 }
 
 function main() {

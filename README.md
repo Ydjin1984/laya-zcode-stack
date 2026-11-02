@@ -96,6 +96,17 @@ The agent should list/use the `laya_*` MCP tools.
 
 ---
 
+## Laya Work (`/work`)
+
+The engine serves a built-in dashboard at `http://127.0.0.1:8095/work`:
+actual model calls, questions/answers, plugin policy, timings, checks and manual
+labels. Events are stored in local SQLite (`engine/data/work.db`); the plugin
+writes fast spool files (`engine/data/work-spool`) and never waits for the
+dashboard, so hooks are not slowed down when it is unavailable. Work routes are
+loopback-only; write ingestion uses a local token with a Windows ACL. Accuracy
+is shown only for manually labeled `call_id/question_id` items.
+See [docs/WORK.md](docs/WORK.md).
+
 ## Install details
 
 - [Windows installation](docs/INSTALL.md)

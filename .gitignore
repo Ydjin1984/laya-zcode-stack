@@ -29,3 +29,6 @@ plugin/experiments/*.log
 Thumbs.db
 
 !engine/third_party/cuda12/README.md
+
+# Laya Work runtime data
+data/

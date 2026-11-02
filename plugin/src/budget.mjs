@@ -15,6 +15,7 @@
 
 import { count, decide } from "./laya-client.mjs";
 import { truncateMiddle } from "./sanitize.mjs";
+import { currentTrace, noteCount, runWithWorkTrace } from "./work-client.mjs";
 
 const DEFAULT_MARGIN = 12;
 const MAX_FIT_ATTEMPTS = 4;
@@ -27,6 +28,21 @@ function questionProblems(counted) {
   const collapsed = qs.some((q) => q.collapsed === true);
   const room = qs.length ? Math.min(...qs.map((q) => Number(q.state_kept) || 0)) : 0;
   return { dropped, head, collapsed, room, fits: !head && !collapsed && dropped === 0 };
+}
+
+function countFit(counted) {
+  const qs = Array.isArray(counted?.questions) ? counted.questions : [];
+  return {
+    counted: true,
+    state_tokens: counted?.state_tokens ?? null,
+    state_kept: qs.length ? Math.min(...qs.map((q) => Number(q.state_kept) || 0)) : null,
+    state_dropped: qs.length ? Math.max(...qs.map((q) => Number(q.state_dropped) || 0)) : null,
+    head_truncated: qs.some((q) => q.head_truncated === true),
+    collapsed: qs.some((q) => q.collapsed === true),
+    max_len: counted?.max_len ?? null,
+    head_max_len: counted?.head_max_len ?? null,
+    truncated_by_client: false,
+  };
 }
 
 function fitSummary(fit) {
@@ -86,7 +102,9 @@ export async function fitState(
 ) {
   const original = String(state ?? "");
   let text = original;
+  const countStart = Date.now();
   let counted = await client.count(text, questions, { cfg, timeoutMs, maxLen });
+  noteCount({ countMs: Date.now() - countStart, fit: counted?.ok ? countFit(counted) : null });
   if (!counted || counted.ok !== true) {
     const error = counted?.error || { code: "count_failed", message: "Laya не ответила на /count" };
     // Старый движок без /count: не маскируем это под «всё помещается».
@@ -127,7 +145,9 @@ export async function fitState(
     if (!cut.truncated) break;
     text = cut.text;
     attempts += 1;
+    const retryStart = Date.now();
     counted = await client.count(text, questions, { cfg, timeoutMs, maxLen });
+    noteCount({ countMs: Date.now() - retryStart, fit: counted?.ok ? countFit(counted) : null });
     if (!counted || counted.ok !== true) {
       const error = counted?.error || { code: "count_failed", message: "Laya не ответила на /count" };
       return { ok: false, code: error.code || "count_failed", error, count: null, counted: true, attempts, text };
@@ -189,7 +209,9 @@ export async function decideManyFitted(items, questions, opts = {}) {
   let probeError = null;
   if (useOneCount) {
     const longest = items.reduce((a, b) => (String(b.state || "").length > String(a.state || "").length ? b : a), items[0]);
+    const probeStart = Date.now();
     const probe = await client.count(String(longest.state || ""), questions, { cfg, timeoutMs, maxLen });
+    noteCount({ countMs: Date.now() - probeStart, fit: probe?.ok ? countFit(probe) : null });
     // 5% запас: токенизация не строго монотонна по длине строки.
     longestFits = probe?.ok === true && questionProblems(probe).fits === true && questionProblems(probe).room > 32;
     if (!probe || probe.ok !== true) probeError = probe?.error || { code: "count_failed", message: "нет ответа /count" };
@@ -208,13 +230,20 @@ export async function decideManyFitted(items, questions, opts = {}) {
       const i = next++;
       if (i >= items.length) return;
       const it = items[i];
-      if (longestFits) {
-        const res = await client.decide(String(it.state || ""), it.questions || questions, { cfg, timeoutMs, maxLen });
-        if (res && res.ok) res.budget_checked = true;
-        out[i] = res;
-      } else {
-        out[i] = await decideFitted(String(it.state || ""), it.questions || questions, { ...opts, onOverflow, concurrency: lim });
-      }
+      const workMeta = {
+        cfg,
+        itemId: it.item_id ?? it.itemId ?? it.id ?? i,
+        batchId: currentTrace()?.trace_id || null,
+      };
+      const run = async () => {
+        if (longestFits) {
+          const res = await client.decide(String(it.state || ""), it.questions || questions, { cfg, timeoutMs, maxLen });
+          if (res && res.ok) res.budget_checked = true;
+          return res;
+        }
+        return decideFitted(String(it.state || ""), it.questions || questions, { ...opts, onOverflow, concurrency: lim });
+      };
+      out[i] = await runWithWorkTrace(workMeta, run);
     }
   });
   await Promise.all(workers);

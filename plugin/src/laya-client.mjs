@@ -21,6 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import http from "node:http";
 import { loadConfig, paths } from "./config.mjs";
+import { beginCall, currentTrace, recordModelCall, workHeaders } from "./work-client.mjs";
 
 /** Ошибка уровня адаптера: код для метрик + человекочитаемый текст. */
 class LayaError extends Error {
@@ -46,7 +47,7 @@ async function loadHttps() {
   return httpsModule;
 }
 
-async function httpRequest(url, { method = "GET", body = null, timeoutMs = 2000 } = {}) {
+async function httpRequest(url, { method = "GET", body = null, timeoutMs = 2000, headers: extraHeaders = {} } = {}) {
   // Разбор URL и выбор модуля — ДО создания Promise: внутри его колбэка await
   // недоступен, а ленивая загрузка https требует await.
   let u;
@@ -57,7 +58,7 @@ async function httpRequest(url, { method = "GET", body = null, timeoutMs = 2000 
   }
   const mod = u.protocol === "https:" ? await loadHttps() : http;
   const payload = body ? Buffer.from(body, "utf8") : null;
-  const headers = {};
+  const headers = { ...extraHeaders };
   if (payload) {
     headers["content-type"] = "application/json; charset=utf-8";
     headers["content-length"] = payload.length;
@@ -141,7 +142,7 @@ function noteSuccess() {
   if (st.failures !== 0 || st.openedAt !== 0) writeBreaker({ failures: 0, openedAt: 0, lastError: "" });
 }
 
-async function request(cfg, urlPath, { method = "GET", body = null, timeoutMs } = {}) {
+async function request(cfg, urlPath, { method = "GET", body = null, timeoutMs, headers } = {}) {
   const url = cfg.layaUrl.replace(/\/+$/, "") + urlPath;
   const effectiveTimeout = timeoutMs ?? cfg.timeoutMs;
   try {
@@ -149,6 +150,7 @@ async function request(cfg, urlPath, { method = "GET", body = null, timeoutMs } 
       method,
       body: body ? JSON.stringify(body) : null,
       timeoutMs: effectiveTimeout,
+      headers,
     });
     let parsed = null;
     try {
@@ -219,20 +221,27 @@ function validateDecide(res) {
  * вызывающий код сам решает, что делать в отсутствие Laya (fail-open).
  */
 export async function decide(state, questions, { cfg = loadConfig(), timeoutMs, maxLen } = {}) {
+  const started = Date.now();
+  const call = beginCall();
   const br = breakerState(cfg);
   if (br.open) {
-    return { ok: false, error: { code: "circuit_open", message: `Laya в cooldown до ${new Date(br.until).toISOString()}` } };
+    const error = { code: "circuit_open", message: `Laya в cooldown до ${new Date(br.until).toISOString()}` };
+    recordModelCall({ cfg, call, state, questions, error, startedAt: started });
+    return { ok: false, error, call_id: call.call_id, trace_id: call.trace_id };
   }
   try {
     const body = { state, questions };
     if (maxLen) body.max_len = maxLen;
-    const res = await request(cfg, "/decide", { method: "POST", body, timeoutMs });
+    const res = await request(cfg, "/decide", { method: "POST", body, timeoutMs, headers: workHeaders(call) });
     const norm = validateDecide(res);
     noteSuccess();
-    return { ok: true, ...norm };
+    recordModelCall({ cfg, call, state, questions, response: { ...norm, ok: true }, startedAt: started });
+    return { ok: true, ...norm, call_id: call.call_id, trace_id: call.trace_id };
   } catch (err) {
     noteFailure(err);
-    return { ok: false, error: { code: err.code || "error", message: String(err.message || err) } };
+    const error = { code: err.code || "error", message: String(err.message || err) };
+    recordModelCall({ cfg, call, state, questions, error, startedAt: started });
+    return { ok: false, error, call_id: call.call_id, trace_id: call.trace_id };
   }
 }
 
@@ -247,7 +256,9 @@ export async function count(state, questions, { cfg = loadConfig(), timeoutMs, m
   try {
     const body = { state, questions };
     if (maxLen) body.max_len = maxLen;
-    const res = await request(cfg, "/count", { method: "POST", body, timeoutMs });
+    const t = currentTrace();
+    const headers = t ? workHeaders({ trace_id: t.trace_id, session_id: t.session_id, operation: t.operation, tool: t.tool }) : undefined;
+    const res = await request(cfg, "/count", { method: "POST", body, timeoutMs, headers });
     if (!res || typeof res.state_tokens !== "number") {
       throw new LayaError("bad_schema", "нет state_tokens");
     }

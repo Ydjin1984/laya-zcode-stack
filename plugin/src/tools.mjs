@@ -20,6 +20,7 @@ import { recordEvent } from "./telemetry.mjs";
 import { searchFiles } from "./search.mjs";
 import { runCheck } from "./run-check.mjs";
 import { findProjectRoot } from "./project.mjs";
+import { currentTrace, runWithWorkTrace } from "./work-client.mjs";
 
 // ------------------------------------------------------------------ утилиты
 
@@ -390,17 +391,20 @@ tool({
     if (!Array.isArray(items) || items.length === 0) return errResult("items пуст.");
     const limit = Math.max(1, Math.min(8, args.concurrency || 4));
     const started = Date.now();
-    const results = await mapLimit(items, limit, async (it, i) => {
-      const qs = normalizeQuestions(it.questions);
-      if (!qs) return { id: it.id || `item${i}`, ok: false, error: "questions пуст" };
-      const problems = validateQuestions(qs);
-      if (problems.length) {
-        return { id: it.id || `item${i}`, ok: false, error: { code: "invalid_questions", message: problems.join("; ") } };
-      }
-      const res = await decideFitted(String(it.state ?? ""), qs, { cfg, onOverflow: "error" });
-      if (!res.ok) return { id: it.id || `item${i}`, ok: false, error: res.error };
-      return { id: it.id || `item${i}`, ok: true, checkpoint: res.checkpoint, elapsed_ms: res.elapsedMs, answers: normAnswers(res), warnings: res.warnings };
-    });
+    const batchId = currentTrace()?.trace_id || null;
+    const results = await mapLimit(items, limit, (it, i) =>
+      runWithWorkTrace({ cfg, itemId: it.id || `item${i}`, batchId }, async () => {
+        const qs = normalizeQuestions(it.questions);
+        if (!qs) return { id: it.id || `item${i}`, ok: false, error: "questions пуст" };
+        const problems = validateQuestions(qs);
+        if (problems.length) {
+          return { id: it.id || `item${i}`, ok: false, error: { code: "invalid_questions", message: problems.join("; ") } };
+        }
+        const res = await decideFitted(String(it.state ?? ""), qs, { cfg, onOverflow: "error" });
+        if (!res.ok) return { id: it.id || `item${i}`, ok: false, error: res.error };
+        return { id: it.id || `item${i}`, ok: true, checkpoint: res.checkpoint, elapsed_ms: res.elapsedMs, answers: normAnswers(res), warnings: res.warnings };
+      }),
+    );
     const okCount = results.filter((r) => r.ok).length;
     recordEvent({ kind: "mcp_call", tool: "laya_batch", source: "mcp:laya_batch", action: `items:${items.length}`, latencyMs: Date.now() - started });
     return okResult(`Laya batch: ${okCount}/${items.length} выполнено за ${Date.now() - started} мс.`, {
@@ -1202,6 +1206,8 @@ tool({
       });
     }
     const totalMs = Date.now() - started;
+    const sourceBytes = found.hits.reduce((n, h) => n + String(h.snippet || "").length, 0);
+    const returnedBytes = results.reduce((n, r) => n + String(r.excerpt || "").length, 0);
     recordEvent({
       kind: "mcp_call",
       tool: "laya_search",
@@ -1236,6 +1242,13 @@ tool({
       chunk_id: allId,
       stored_ids: [allId, ...chunkIds],
       warnings: found.warnings,
+      savings: {
+        source_bytes: sourceBytes,
+        returned_bytes: returnedBytes,
+        followup_bytes: 0,
+        chunk_id: allId,
+        stored_ids: [allId, ...chunkIds],
+      },
     });
   },
 });
@@ -1421,6 +1434,8 @@ tool({
       parts.join("\n") +
       `\nПолный файл: laya_get_chunk("${chunkId}"). Перед редактированием дочитай нужную реализацию — выдержки не заменяют исходник.`;
 
+    const sourceBytes = buf.length;
+    const returnedBytes = selected.reduce((n, r) => n + String(r.blockText || "").length, 0);
     recordEvent({
       kind: "mcp_call",
       tool: "laya_read_relevant",
@@ -1439,6 +1454,13 @@ tool({
       chunk_id: chunkId,
       laya_used: layaUsed,
       degraded,
+      savings: {
+        source_bytes: sourceBytes,
+        returned_bytes: returnedBytes,
+        followup_bytes: 0,
+        chunk_id: chunkId,
+        omitted_blocks: omittedBlocks.length,
+      },
     });
   },
 });

@@ -122,6 +122,11 @@ type configProbe struct {
 		LayaPolicy  string   `json:"layaPolicy"`
 		ActiveModes []string `json:"activeModes"`
 	} `json:"riskGate"`
+	Work struct {
+		Enabled   bool   `json:"enabled"`
+		SpoolDir  string `json:"spoolDir"`
+		TokenFile string `json:"tokenFile"`
+	} `json:"work"`
 }
 
 // dataDir повторяет порядок из src/config.mjs, чтобы лаунчер и Node читали
@@ -236,6 +241,65 @@ func writeSkipMetric(reason string, in hookInput, cfg configProbe) {
 	_, _ = f.Write(append(raw, '\n'))
 }
 
+// writeSkipWork пишет policy-событие в spool панели Work без запуска Node и
+// без сетевого ожидания. Текст команды сюда НЕ попадает: для пропуска достаточно
+// факта «Laya не вызывалась» и причины, а команда может содержать секрет.
+func writeSkipWork(reason string, in hookInput, cfg configProbe) {
+	if !cfg.Work.Enabled {
+		return
+	}
+	if reason == "" {
+		reason = "read_only"
+	}
+	dir := cfg.Work.SpoolDir
+	if dir == "" && cfg.Work.TokenFile != "" {
+		dir = filepath.Join(filepath.Dir(cfg.Work.TokenFile), "work-spool")
+	}
+	if dir == "" {
+		return
+	}
+	if err := os.MkdirAll(dir, 0o777); err != nil {
+		return
+	}
+	now := time.Now()
+	ev := map[string]any{
+		"schema_version": 1,
+		"event_id":       fmt.Sprintf("launcher_%d_%d", now.UnixNano(), os.Getpid()),
+		"trace_id":       "launcher_" + in.SessionID,
+		"call_id":        fmt.Sprintf("launcher_call_%d", now.UnixNano()),
+		"session_id":     in.SessionID,
+		"timestamp":      now.UTC().Format(time.RFC3339Nano),
+		"source":         "launcher",
+		"kind":           "policy",
+		"operation":      "risk_gate",
+		"status":         "skipped",
+		"policy_version": "work-v1",
+		"policy_result": map[string]any{
+			"action":      "skip_mode",
+			"basis":       "permission_mode",
+			"laya_called": false,
+			"reason":      reason,
+		},
+		"evidence": map[string]any{
+			"permission_mode": in.permMode(),
+			"active_modes":    cfg.RiskGate.ActiveModes,
+			"launcher":        true,
+		},
+		"timing_ms": map[string]any{"total": 0},
+	}
+	raw, err := json.Marshal(ev)
+	if err != nil {
+		return
+	}
+	name := fmt.Sprintf("w-%d-%d.json", now.UnixNano(), os.Getpid())
+	tmp := filepath.Join(dir, "."+name+".tmp")
+	final := filepath.Join(dir, name)
+	if err := os.WriteFile(tmp, raw, 0o644); err != nil {
+		return
+	}
+	_ = os.Rename(tmp, final)
+}
+
 // shouldSkip отвечает, можно ли обойтись без Node для этого события.
 //
 // Два независимых основания:
@@ -304,6 +368,7 @@ func main() {
 		if metric {
 			writeSkipMetric(reason, in, cfg)
 		}
+		writeSkipWork(reason, in, cfg)
 		os.Exit(0)
 	}
 	runNode(script, raw)

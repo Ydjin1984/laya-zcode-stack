@@ -10,7 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const files = ["gate-fixtures.test.mjs", "launcher.test.mjs", "replay.test.mjs", "tools-validation.test.mjs", "tools-self-fetch.test.mjs", "admin-cli.test.mjs", "laya-all-policy.test.mjs", "contract.test.mjs", "mcp-smoke.test.mjs"];
+const files = ["gate-fixtures.test.mjs", "launcher.test.mjs", "replay.test.mjs", "work-client.test.mjs", "tools-validation.test.mjs", "tools-self-fetch.test.mjs", "admin-cli.test.mjs", "laya-all-policy.test.mjs", "contract.test.mjs", "mcp-smoke.test.mjs"];
 
 let failed = 0;
 const started = Date.now();
