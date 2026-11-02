@@ -105,7 +105,10 @@ writes fast spool files (`engine/data/work-spool`) and never waits for the
 dashboard, so hooks are not slowed down when it is unavailable. Work routes are
 loopback-only; write ingestion uses a local token with a Windows ACL. Accuracy
 is shown only for manually labeled `call_id/question_id` items.
-See [docs/WORK.md](docs/WORK.md).
+See [docs/WORK.md](docs/WORK.md). After installing the plugin, set
+`work.spoolDir` and `work.tokenFile` in its `config.json` to this machine's
+engine `data` directory (the server creates `work-spool` and `work-token` on
+first start).
 
 ## Install details
 
