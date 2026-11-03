@@ -89,6 +89,15 @@ The router never switches the model.
 `layaAll` lowers the thresholds for self-fetching tools but does not require a
 `laya_*` call on every turn. Small operations should use normal `Read`/`rg`.
 
+With `layaAll: true`:
+- `laya_search` ranks up to 32 local candidates, returns 5 excerpts, default
+  budget 4500 chars (instead of 24 / 8 / 6000);
+- `laya_read_relevant` returns up to 6 blocks, default budget 6000 chars
+  (instead of 8 / 8000);
+- `laya_search_relevant` returns 6 excerpts, inline budget 2000 chars.
+Local ranking is cheap and does not consume the main model's tokens; fewer
+excerpts go into the main context. Full text remains available via `chunk_id`.
+
 - `laya_search(query, root?, budget?, top_k?, max_candidates?, context?, timeout_ms?, case_sensitive?, fixed?)`
 - `laya_read_relevant(path, query, budget?, context?, max_blocks?, use_laya?)`
 - `laya_run_check(check_id, budget?, root?, timeout_ms?)`

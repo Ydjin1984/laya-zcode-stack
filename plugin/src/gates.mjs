@@ -527,8 +527,11 @@ export async function sessionStartGate(input, deps = {}) {
     const modes = Array.isArray(cfg.riskGate.activeModes) && cfg.riskGate.activeModes.length
       ? cfg.riskGate.activeModes.join(",")
       : "все";
+    const hint = cfg.layaAll
+      ? " Для широкого поиска, больших файлов и логов используй laya_search/laya_read_relevant/laya_run_check; полный текст — по chunk_id."
+      : "";
     const line = h.ok
-      ? `Laya: готова (${h.device}, ${h.checkpointId || "чекпоинт неизвестен"}). Режимы: risk=${cfg.riskGate.mode}, done=${cfg.doneGate.mode}, router=${cfg.router.mode}; гейты вмешиваются только в: ${modes}.`
+      ? `Laya: готова (${h.device}, ${h.checkpointId || "чекпоинт неизвестен"}). Режимы: risk=${cfg.riskGate.mode}, done=${cfg.doneGate.mode}, router=${cfg.router.mode}; гейты вмешиваются только в: ${modes}.${hint}`
       : `Laya: недоступна (${h.error?.code || "error"}) — работа продолжается штатно, разрешения не изменяются.`;
     output = { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: line } };
   }

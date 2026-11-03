@@ -24,6 +24,15 @@ import { currentTrace, runWithWorkTrace } from "./work-client.mjs";
 
 // ------------------------------------------------------------------ утилиты
 
+/**
+ * Laya-first: больше кандидатов ранжируется локально, но меньше текста
+ * возвращается в основной контекст. Локальный инференс не расходует токены
+ * главной модели, поэтому это баланс «точнее выбор, меньше выдачи».
+ */
+function layaFirst(cfg) {
+  return cfg?.layaAll === true;
+}
+
 /** Параллельная обработка с ограничением одновременных запросов. */
 async function mapLimit(items, limit, fn) {
   const out = new Array(items.length);
@@ -468,7 +477,8 @@ tool({
       index: i,
     }));
     const byOverlap = [...scored].sort((a, b) => b.overlap - a.overlap || a.index - b.index);
-    const maxCand = Math.max(1, Math.min(48, args.max_candidates || 24));
+    const first = layaFirst(cfg);
+    const maxCand = Math.max(1, Math.min(48, args.max_candidates || (first ? 32 : 24)));
     const candidates = byOverlap.filter((h) => h.overlap > 0).slice(0, maxCand);
     const stored = storeChunks(candidates.map((c) => ({ id: `search-${c.id}`, kind: "search_hit", text: c.snippet })));
     pruneChunks(cfg);
@@ -487,14 +497,14 @@ tool({
       return { ...c, relevance: a.score, confidence: a.answer_confidence, degraded: !res.trustworthy };
     });
     const ordered = [...ranked].sort((a, b) => (b.relevance ?? -1) - (a.relevance ?? -1) || b.overlap - a.overlap);
-    const topK = Math.max(1, Math.min(32, args.top_k || 8));
+    const topK = Math.max(1, Math.min(32, args.top_k || (first ? 6 : 8)));
     const top = ordered.slice(0, topK);
     const rest = ordered.slice(topK);
     recordEvent({ kind: "mcp_call", tool: "laya_search_relevant", source: "mcp:laya_search_relevant", action: `hits:${hits.length}→cand:${candidates.length}`, latencyMs: Date.now() - started });
 
     // Встроенные сниппеты top-k в пределах бюджета символов: этого часто хватает
     // для ответа без чтения файлов вообще.
-    const budget = Math.max(400, Math.min(8000, args.inline_chars || 2500));
+    const budget = Math.max(400, Math.min(8000, args.inline_chars || (first ? 2000 : 2500)));
     let spent = 0;
     const lines = [];
     const rankedOut = [];
@@ -1090,9 +1100,10 @@ tool({
     const query = String(args.query || "").trim();
     if (!query) return errResult("query пуст.");
     const root = path.resolve(args.root || process.env.DAVINCI_LAYA_PROJECT_DIR || process.cwd());
-    const budget = Math.max(800, Math.min(30_000, Number(args.budget) || 6000));
-    const topK = Math.max(1, Math.min(20, Number(args.top_k) || 8));
-    const maxCand = Math.max(1, Math.min(48, Number(args.max_candidates) || 24));
+    const first = layaFirst(cfg);
+    const budget = Math.max(800, Math.min(30_000, Number(args.budget) || (first ? 4500 : 6000)));
+    const topK = Math.max(1, Math.min(20, Number(args.top_k) || (first ? 5 : 8)));
+    const maxCand = Math.max(1, Math.min(48, Number(args.max_candidates) || (first ? 32 : 24)));
     const started = Date.now();
 
     let found;
@@ -1305,9 +1316,10 @@ tool({
     if (buf.subarray(0, 8192).includes(0)) return errResult("Файл выглядит бинарным — блоки кода не извлекаются.");
     const text = buf.toString("utf8");
     const lines = text.split(/\r?\n/);
-    const budget = Math.max(800, Math.min(30_000, Number(args.budget) || cfg.readRelevant?.budget || 8000));
+    const first = layaFirst(cfg);
+    const budget = Math.max(800, Math.min(30_000, Number(args.budget) || (first ? 6000 : cfg.readRelevant?.budget || 8000)));
     const context = Math.max(0, Math.min(20, Number(args.context) || cfg.readRelevant?.contextLines || 6));
-    const maxBlocks = Math.max(1, Math.min(20, Number(args.max_blocks) || cfg.readRelevant?.maxBlocks || 8));
+    const maxBlocks = Math.max(1, Math.min(20, Number(args.max_blocks) || (first ? 6 : cfg.readRelevant?.maxBlocks || 8)));
     const terms = [...tokens(query)];
 
     const matchLines = [];
